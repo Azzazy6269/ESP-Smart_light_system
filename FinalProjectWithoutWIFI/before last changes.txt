@@ -9,6 +9,7 @@
 int ldrValue;       
 int brightness;
 int peopleCount = 0;
+
 unsigned long t1 = 0, t2 = 0;
 unsigned long lastTrigger1 = 0;
 unsigned long lastTrigger2 = 0;
@@ -16,6 +17,25 @@ const unsigned long debounceDelay = 3000;
 
 bool detected1 = false;
 bool detected2 = false;
+
+#include <WiFi.h>
+#include <FirebaseESP32.h>
+
+// WiFi credentials
+#define WIFI_SSID "RED ADSL"
+#define WIFI_PASSWORD "RED01092641615"
+
+// Firebase project info
+#define FIREBASE_HOST "https://first-lighting-trial-default-rtdb.firebaseio.com/"  // Database URL
+#define FIREBASE_AUTH "AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA" // Web API Key (مش secret key)
+
+// Firebase objects
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+unsigned long lastUploadTime = 0;
+const unsigned long uploadInterval = 5000;
 
 
 void setup() {
@@ -33,11 +53,42 @@ void setup() {
 
   // No need to write pinMode(LDR_PIN, INPUT) as analog input pins are default to INPUT mode when you call analogRead()
 
+  // Connect to Wi-Fi
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.println("Connected to Wi-Fi");
+
+  // Configure Firebase
+  config.api_key = FIREBASE_AUTH;
+  config.database_url = FIREBASE_HOST;
+
+  // Optional: تسجيل دخول بدون حساب (Anonymous)
+  auth.user.email = "";
+  auth.user.password = "";
+
+  // Initialize Firebase
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+
 }
 
 void loop() {
  LDR_Check();
  Infrared_Check();
+ PIR_Check();
+
+ unsigned long currentTime = millis();
+  if (currentTime - lastUploadTime >= uploadInterval) {
+    Firebase.RTDB.setInt(&fbdo, "/room/peopleCount", peopleCount);
+    Firebase.RTDB.setInt(&fbdo, "/room/LDR_LED_Brightness", brightness);
+    lastUploadTime = currentTime;
+  }
 
 }
 
@@ -95,23 +146,20 @@ void Infrared_Check(){
   }
 
   // LED logic
-   if(PIR_Check() && peopleCount > 0){
-      digitalWrite(LED_IR, HIGH);
-   }else{
-      digitalWrite(LED_IR, LOW);
-   }
-    
+  if (peopleCount == 0) {
+    digitalWrite(LED_IR, LOW);
+  } else {
+    digitalWrite(LED_IR, HIGH);
   }
 
- 
+  delay(50);
+}
 
-bool PIR_Check(){
+void PIR_Check(){
   if (digitalRead(PIR_PIN) == HIGH) {
-    return true;
-   // ledcWrite(1, 255);  
+    ledcWrite(1, 255);  
   } else {
-    return false;
-    //ledcWrite(1, 0);    
+    ledcWrite(1, 0);    
    // delay(5000);
   }
 }
