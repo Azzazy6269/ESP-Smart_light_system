@@ -1,6 +1,6 @@
-#define IR1 18
-#define IR2 19
-#define LED 2
+#define IR1 32
+#define IR2 33
+#define LED 14
 
 int peopleCount = 0;
 unsigned long t1 = 0, t2 = 0;

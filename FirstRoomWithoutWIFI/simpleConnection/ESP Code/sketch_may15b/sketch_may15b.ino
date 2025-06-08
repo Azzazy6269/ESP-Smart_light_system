@@ -12,7 +12,7 @@ int peopleCount = 0;
 unsigned long t1 = 0, t2 = 0;
 unsigned long lastTrigger1 = 0;
 unsigned long lastTrigger2 = 0;
-const unsigned long debounceDelay = 3000;
+const unsigned long debounceDelay = 1500;
 
 bool detected1 = false;
 bool detected2 = false;

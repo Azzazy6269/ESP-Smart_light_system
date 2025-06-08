@@ -1,4 +1,4 @@
-#define PIR_PIN 8      // PIR sensor output pin
+#define PIR_PIN 35      // PIR sensor output pin
 #define LED_PIN 6      // LED PWM pin
 #define TIMEOUT 3600000  // 1 hour in milliseconds
 

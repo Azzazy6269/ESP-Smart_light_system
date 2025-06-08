@@ -1,8 +1,7 @@
 #define IR1 32
 #define IR2 33
-#define LED_IR 26
+#define LED_IR 14
 #define PIR_PIN 35          
-#define LED_PIR 13
 
 int ldrValue;       
 int brightness;
@@ -10,7 +9,7 @@ int peopleCount = 0;
 unsigned long t1 = 0, t2 = 0;
 unsigned long lastTrigger1 = 0;
 unsigned long lastTrigger2 = 0;
-const unsigned long debounceDelay = 3000;
+const unsigned long debounceDelay = 800;
 
 bool detected1 = false;
 bool detected2 = false;
@@ -24,7 +23,7 @@ void setup() {
 
   pinMode(PIR_PIN, INPUT);
   ledcSetup(1, 5000, 8);
-  ledcAttachPin(LED_PIR, 1);
+  //ledcAttachPin(LED_PIR, 1);
 
   ledcSetup(0, 5000, 8);       // channel 0, ferq 5 kh , resolution 8 bit (0-255)
 
@@ -61,7 +60,7 @@ void Infrared_Check(){
 
   // Check both sensors triggered
   if (detected1 && detected2) {
-    if (abs((long)t1 - (long)t2) < 3000) { // ensure it’s within expected time
+    if (abs((long)t1 - (long)t2) < 1500) { // ensure it’s within expected time
       if (t1 < t2) {
         peopleCount++;
         Serial.println("Person Entered");
@@ -74,6 +73,17 @@ void Infrared_Check(){
     }
 
     detected1 = false;
+    detected2 = false;
+    t1 = 0;
+    t2 = 0;
+  }else if(detected1 && millis()-t1 > 1500){
+     detected1 = false;
+    detected2 = false;
+    t1 = 0;
+    t2 = 0;
+  }
+  else if(detected2 && millis()-t2 > 1500){
+     detected1 = false;
     detected2 = false;
     t1 = 0;
     t2 = 0;

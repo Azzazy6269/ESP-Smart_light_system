@@ -2,15 +2,13 @@
 #define LED_LDR 12   
 #define IR1_r1 18
 #define IR2_r1 19
-#define LED_IR_r1 2
 #define PIR_PIN_r1 27          
-#define LED_PIR_r1 14
+#define LED_r1 2
 
 #define IR1_r2 32
 #define IR2_r2 33
-#define LED_IR_r2 26
 #define PIR_PIN_r2 35          
-#define LED_PIR_r2 13
+#define LED_r2 14
 
 int ldrValue;       
 int brightness;
@@ -29,7 +27,7 @@ unsigned long lastTrigger2_r2 = 0;
 bool detected1_r2 = false;
 bool detected2_r2 = false;
 
-const unsigned long debounceDelay = 3000;
+const unsigned long debounceDelay = 1500;
 
 
 void setup() {
@@ -37,22 +35,22 @@ void setup() {
 
   pinMode(IR1_r1, INPUT);
   pinMode(IR2_r1, INPUT);
-  pinMode(LED_IR_r1, OUTPUT);
+  pinMode(LED_r1, OUTPUT);
 
   pinMode(PIR_PIN_r1, INPUT);
-  ledcSetup(1, 5000, 8); // bug
-  ledcAttachPin(LED_PIR_r1, 1);
+ // ledcSetup(1, 5000, 8); // bug
+ // ledcAttachPin(LED_PIR_r1, 1);
 
   ledcSetup(0, 5000, 8);       // channel 0, ferq 5 kh , resolution 8 bit (0-255)
   ledcAttachPin(LED_LDR, 0);   // connect channel to pin
 
   pinMode(IR1_r2, INPUT);
   pinMode(IR2_r2, INPUT);
-  pinMode(LED_IR_r2, OUTPUT);
+  pinMode(LED_r2, OUTPUT);
 
   pinMode(PIR_PIN_r2, INPUT);
-  ledcSetup(2, 5000, 8); // bug
-  ledcAttachPin(LED_PIR_r2, 2);
+ // ledcSetup(2, 5000, 8); // bug
+ // ledcAttachPin(LED_PIR_r2, 2);
 
 
   // No need to write pinMode(LDR_PIN, INPUT) as analog input pins are default to INPUT mode when you call analogRead()
@@ -120,9 +118,9 @@ void Infrared_Check_r1(){
   }
 
    if(PIR_Check(PIR_PIN_r1) && peopleCount_r1 > 0){
-      digitalWrite(LED_IR_r1, HIGH);
+      digitalWrite(LED_r1, HIGH);
    }else{
-      digitalWrite(LED_IR_r1, LOW);
+      digitalWrite(LED_r1, LOW);
    }
     
 }
@@ -170,9 +168,9 @@ void Infrared_Check_r1(){
   }
 
    if(PIR_Check(PIR_PIN_r2) && peopleCount_r2 > 0){
-      digitalWrite(LED_IR_r2, HIGH);
+      digitalWrite(LED_r2, HIGH);
    }else{
-      digitalWrite(LED_IR_r2, LOW);
+      digitalWrite(LED_r2, LOW);
    }
     
 }
