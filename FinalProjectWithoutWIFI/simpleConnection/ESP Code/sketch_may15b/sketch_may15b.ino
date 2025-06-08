@@ -27,7 +27,7 @@ unsigned long lastTrigger2_r2 = 0;
 bool detected1_r2 = false;
 bool detected2_r2 = false;
 
-const unsigned long debounceDelay = 1500;
+const unsigned long debounceDelay = 800;
 
 
 void setup() {
@@ -99,7 +99,7 @@ void Infrared_Check_r1(){
 
   // Check both sensors triggered
   if (detected1_r1 && detected2_r1) {
-    if (abs((long)t1_r1 - (long)t2_r1) < 3000) { // ensure it’s within expected time
+    if (abs((long)t1_r1 - (long)t2_r1) < 1500) { // ensure it’s within expected time
       if (t1_r1 < t2_r1) {
         peopleCount_r1++;
         Serial.println("Person Entered");
@@ -112,6 +112,17 @@ void Infrared_Check_r1(){
     }
 
     detected1_r1 = false;
+    detected2_r1 = false;
+    t1_r1 = 0;
+    t2_r1 = 0;
+  }else if(detected1_r1 && millis()-t1_r1 > 1500){
+     detected1_r1 = false;
+    detected2_r1 = false;
+    t1_r1 = 0;
+    t2_r1 = 0;
+  }
+  else if(detected2_r1 && millis()-t2_r1 > 1500){
+     detected1_r1 = false;
     detected2_r1 = false;
     t1_r1 = 0;
     t2_r1 = 0;
@@ -162,6 +173,17 @@ void Infrared_Check_r1(){
     }
 
     detected1_r2 = false;
+    detected2_r2 = false;
+    t1_r2 = 0;
+    t2_r2 = 0;
+  }else if(detected1_r2 && millis()-t1_r2 > 1500){
+     detected1_r2 = false;
+    detected2_r2 = false;
+    t1_r2 = 0;
+    t2_r2 = 0;
+  }
+  else if(detected2_r2 && millis()-t2_r2 > 1500){
+     detected1_r2 = false;
     detected2_r2 = false;
     t1_r2 = 0;
     t2_r2 = 0;

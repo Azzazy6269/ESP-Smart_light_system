@@ -92,6 +92,17 @@ void Infrared_Check(){
     detected2 = false;
     t1 = 0;
     t2 = 0;
+  }else if(detected1 && millis()-t1 > 1500){
+     detected1 = false;
+    detected2 = false;
+    t1 = 0;
+    t2 = 0;
+  }
+  else if(detected2 && millis()-t2 > 1500){
+     detected1 = false;
+    detected2 = false;
+    t1 = 0;
+    t2 = 0;
   }
 
   // LED logic
