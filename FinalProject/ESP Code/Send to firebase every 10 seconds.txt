@@ -48,16 +48,9 @@ bool detected2_r2 = false;
 
 const unsigned long debounceDelay = 800;
 
-int lastLed_r1 = 0;
-int lastLed_r2 = 0;
-int lastLdr = 0;
-int currentLed_r1 = 0;
-int currentLed_r2 = 0;
-int currentLdr = 0;
-
 bool Automatic = true;
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 3000;
+const unsigned long sendInterval = 10000;
 /*******************************************************/
 
 void setup() {
@@ -95,11 +88,6 @@ void setup() {
 
    pinMode(PIR_PIN_r2, INPUT);
   /*********************************************************/
-  ReadFromFirebase();
-
-  //if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-  //  Automatic = firebaseData.boolData();
- 
 }
 
 void loop() {
@@ -112,28 +100,41 @@ void loop() {
       lastSendTime = millis();
     }
 
-  }else{
-    if (millis() - lastSendTime > sendInterval) {
-      ReadFromFirebase();
-      lastSendTime = millis();
   }
     
 }
+
+void SendToFirebase(){
+  Firebase.RTDB.setInt(&firebaseData, "/room1/led",digitalRead(LED_r1) );
+  Firebase.RTDB.setInt(&firebaseData, "/room2/led",digitalRead(LED_r2) );
+  Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )
+
+  if (Firebase.RTDB.setInt(&firebaseData, "/room1/led",digitalRead(LED_r1) ))
+   {
+  } else {
+    Serial.print("Firebase setInt led1 failed: ");
+    Serial.println(firebaseData.errorReason());
+  }
+  if (Firebase.RTDB.setInt(&firebaseData, "/room2/led",digitalRead(LED_r2) )) {
+  } else {
+    Serial.print("Firebase setInt led2 failed: ");
+    Serial.println(firebaseData.errorReason());
+  }
+  if (Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )) {
+  } else {
+    Serial.print("Firebase setInt brightness failed: ");
+    Serial.println(firebaseData.errorReason());
+  }
 }
-
-
 
 void LDR_Check(){
   ldrValue = analogRead(LDR_PIN);  // range 0:4095
   if (ldrValue > 3200) {  
-    brightness = 0; 
-    currentLdr = 0;
+    brightness = 0;      
   } else if (ldrValue > 1600) {  
-    brightness = 128;
-    currentLdr = 1;    
+    brightness = 128;    
   } else {  
-    brightness = 255;
-    currentLdr = 1;    
+    brightness = 255;    
   }ledcWrite(0, brightness);  // channel 0
 }
 
@@ -189,12 +190,11 @@ void Infrared_Check_r1(){
     t1_r1 = 0;
     t2_r1 = 0;
   }
+
    if(PIR_Check(PIR_PIN_r1) && peopleCount_r1 > 0){
       digitalWrite(LED_r1, HIGH);
-      currentLed_r1 = 1;
    }else{
       digitalWrite(LED_r1, LOW);
-      currentLed_r1 = 0;
    }
     
 }
@@ -254,10 +254,8 @@ void Infrared_Check_r1(){
 
    if(PIR_Check(PIR_PIN_r2) && peopleCount_r2 > 0){
       digitalWrite(LED_r2, HIGH);
-      currentLed_r2 = 1;
    }else{
       digitalWrite(LED_r2, LOW);
-      currentLed_r2 = 0;
    }
     
 }
@@ -270,48 +268,5 @@ bool PIR_Check(int pin){
   }
 }
 
-void SendToFirebase(){
-  if(lastLed_r1 != currentLed_r1){
-    if(Firebase.RTDB.setInt(&firebaseData, "/room1/led",digitalRead(LED_r1))) {
-      lastLed_r1 = currentLed_r1;
-    }
-  }
-  if(lastLed_r2 != currentLed_r2){
-    if(Firebase.RTDB.setInt(&firebaseData, "/room2/led",digitalRead(LED_r2) )){
-      lastLed_r2 = currentLed_r2;
-    }
-  }
-  if(lastLdr != currentLdr){
-    if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )){
-      lastLdr = currentLdr;
-    }
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-    Automatic = firebaseData.boolData(); 
- }
-}
-void ReadFromFirebase(){
-  if (Firebase.RTDB.getInt(&firebaseData, "/room1/led")) {
-     currentLed_r1 = firebaseData.intData();
-     digitalWrite(LED_r1, currentLed_r1);
-     
-  }
-  if (Firebase.RTDB.getInt(&firebaseData, "/room2/led")) {
-     currentLed_r2 = firebaseData.intData();
-     digitalWrite(LED_r2, currentLed_r2);
-  }
-  if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
-     currentLdr = firebaseData.intData();
-     ledcWrite(0, currentLdr);
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-    Automatic = firebaseData.boolData();
-    if(Automatic){
-      lastLed_r1 = !currentLed_r1;
-      lastLed_r2 = !currentLed_r2;
-      lastLdr = !currentLdr;
-      SendToFirebase();
-    }
- }
-}
+
 
