@@ -86,7 +86,7 @@ void Infrared_Check_r1(){
     t1_r1 = currentTime;
     detected1_r1 = true;
     lastTrigger1_r1 = currentTime;
-    Serial.println("IR1 triggered");
+    Serial.println("IR1_r1 triggered");
   }
 
   // IR2
@@ -94,7 +94,7 @@ void Infrared_Check_r1(){
     t2_r1 = currentTime;
     detected2_r1 = true;
     lastTrigger2_r1 = currentTime;
-    Serial.println("IR2 triggered");
+    Serial.println("IR2_r1 triggered");
   }
 
   // Check both sensors triggered
@@ -147,7 +147,7 @@ void Infrared_Check_r1(){
     t1_r2 = currentTime;
     detected1_r2 = true;
     lastTrigger1_r2 = currentTime;
-    Serial.println("IR1 triggered");
+    Serial.println("IR1_r2 triggered");
   }
 
   // IR2
@@ -155,7 +155,7 @@ void Infrared_Check_r1(){
     t2_r2 = currentTime;
     detected2_r2 = true;
     lastTrigger2_r2 = currentTime;
-    Serial.println("IR2 triggered");
+    Serial.println("IR2_r2 triggered");
   }
 
   // Check both sensors triggered

@@ -8,8 +8,8 @@ const char* ssid = "realme 6";
 const char* password = "55555555";
 
 // Firebase Credentials
-#define FIREBASE_HOST "first-lighting-trial-default-rtdb.firebaseio.com"
-#define FIREBASE_AUTH "AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA"
+#define FIREBASE_HOST "graduation-project-bumgd17-default-rtdb.firebaseio.com"
+#define FIREBASE_AUTH "AIzaSyDr7hgjahxcQkUsBAlB6MEi9Mjt14MZe5A"
 
 // Firebase and Wi-Fi objects
 FirebaseData firebaseData;
@@ -55,9 +55,7 @@ int currentLed_r1 = 0;
 int currentLed_r2 = 0;
 int currentLdr = 0;
 
-bool Automatic_r1 = true;
-bool Automatic_r2 = true;
-bool Automatic_main = true;
+bool Automatic = true;
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 3000;
 /*******************************************************/
@@ -105,28 +103,25 @@ void setup() {
 }
 
 void loop() {
-  if(Automatic_main){
+  if(Automatic){
     LDR_Check();
-  }
-  if(Automatic_r1){
     Infrared_Check_r1();
-  }
-  if(Automatic_r2){
     Infrared_Check_r2();
-  }
-  if (millis() - lastSendTime > sendInterval) {
+    if (millis() - lastSendTime > sendInterval) {
       SendToFirebase();
+      lastSendTime = millis();
+    }
+
+  }else{
+    if (millis() - lastSendTime > sendInterval) {
       ReadFromFirebase();
       lastSendTime = millis();
   }
-  //if(!Automatic_main || !Automatic_r1 || !Automatic_r2){
-    //if (millis() - lastSendTime > sendInterval) {
-      //ReadFromFirebase();
-      //lastSendTime = millis();
-  //}
-  //}
     
 }
+}
+
+
 
 void LDR_Check(){
   ldrValue = analogRead(LDR_PIN);  // range 0:4095
@@ -276,65 +271,47 @@ bool PIR_Check(int pin){
 }
 
 void SendToFirebase(){
-  if(Automatic_r1){
-   if(lastLed_r1 != currentLed_r1){
+  if(lastLed_r1 != currentLed_r1){
     if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_one",digitalRead(LED_r1))) {
       lastLed_r1 = currentLed_r1;
     }
-   }
   }
-  if(Automatic_r2){
-   if(lastLed_r2 != currentLed_r2){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_two",digitalRead(LED_r2))){
+  if(lastLed_r2 != currentLed_r2){
+    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_two",digitalRead(LED_r2) )){
       lastLed_r2 = currentLed_r2;
     }
-   }
   }
-  if(Automatic_main){
-   if(lastLdr != currentLdr){
-    if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness)){
+  if(lastLdr != currentLdr){
+    if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )){
       lastLdr = currentLdr;
     }
-   }
   }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r1")) {
-    Automatic_r1 = firebaseData.boolData(); 
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
-    Automatic_r2 = firebaseData.boolData(); 
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_main")) {
-    Automatic_main = firebaseData.boolData(); 
-  }
+  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
+    Automatic = firebaseData.boolData(); 
+ }
 }
-
 void ReadFromFirebase(){
-  if(!Automatic_r1){
-   if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_one")) {
+  if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_one")) {
      currentLed_r1 = firebaseData.intData();
      digitalWrite(LED_r1, currentLed_r1);
-   }
+     
   }
-  if(!Automatic_r2){
-   if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_two")) {
+  if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_two")) {
      currentLed_r2 = firebaseData.intData();
      digitalWrite(LED_r2, currentLed_r2);
-   }
   }
-  if(Automatic_main){
-   if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
+  if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
      currentLdr = firebaseData.intData();
      ledcWrite(0, currentLdr);
-   }
   }
-  //if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-    //Automatic = firebaseData.boolData();
-    //if(Automatic){
-      //lastLed_r1 = !currentLed_r1;
-      //lastLed_r2 = !currentLed_r2;
-      //lastLdr = !currentLdr;
-     // SendToFirebase();
-   // }
- //}
+  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
+    Automatic = firebaseData.boolData();
+    if(Automatic){
+      lastLed_r1 = !currentLed_r1;
+      lastLed_r2 = !currentLed_r2;
+      lastLdr = !currentLdr;
+      SendToFirebase();
+    }
+ }
 }
 
