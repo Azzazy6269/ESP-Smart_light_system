@@ -47,7 +47,7 @@ bool detected1_r2 = false;
 bool detected2_r2 = false;
 
 const unsigned long debounceDelay = 800;
-/*
+
 int lastLed_r1 = 0;
 int lastLed_r2 = 0;
 int lastLdr = 0;
@@ -61,7 +61,6 @@ bool Automatic_r2 = true;
 unsigned long lastSendTime_r1 = 0;
 unsigned long lastSendTime_r2 = 0;
 const unsigned long sendInterval = 3000;
-*/
 /*******************************************************/
 
 void setup() {
@@ -99,15 +98,24 @@ void setup() {
 
    pinMode(PIR_PIN_r2, INPUT);
   /*********************************************************/
-  //ReadFromFirebase_r1();
-  //ReadFromFirebase_r2();
-
-  //if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-  //  Automatic = firebaseData.boolData();
+  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r1")) {
+    Automatic_r1 = firebaseData.boolData();
+    if(Automatic_r1){
+      lastLed_r1 = !currentLed_r1;
+      lastLdr = !currentLdr;
+     // SendToFirebase_r1();
+    }
+  }
+  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
+    Automatic_r2 = firebaseData.boolData();
+    if(Automatic_r2){
+      lastLed_r2 = !currentLed_r2;
+     // SendToFirebase_r2();
+    }
+  }
  
 }
 
-/*
 void loop() {
   if(Automatic_r1){
     LDR_Check();
@@ -121,8 +129,8 @@ void loop() {
     if (millis() - lastSendTime_r1 > sendInterval) {
       ReadFromFirebase_r1();
       lastSendTime_r1 = millis();
-  }
-
+    }
+   }
   if(Automatic_r2){
     Infrared_Check_r2();
     if (millis() - lastSendTime_r2 > sendInterval) {
@@ -346,13 +354,4 @@ void ReadFromFirebase_r2(){
     }
  }
 }
-*/
-/*
-void Firebase(){
-  SendToFirebase_r1();
-  SendToFirebase_r2();
-  ReadFromFirebase_r1();
-  ReadFromFirebase_r2();
-}
-*/
 
