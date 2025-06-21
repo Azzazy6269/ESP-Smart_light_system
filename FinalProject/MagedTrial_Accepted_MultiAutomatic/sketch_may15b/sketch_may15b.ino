@@ -9,7 +9,7 @@ const char* password = "55555555";
 
 // Firebase Credentials
 #define FIREBASE_HOST "first-lighting-trial-default-rtdb.firebaseio.com"
-#define FIREBASE_AUTH ""AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA""
+#define FIREBASE_AUTH "AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA"
 
 // Firebase and Wi-Fi objects
 FirebaseData firebaseData;
@@ -47,7 +47,7 @@ bool detected1_r2 = false;
 bool detected2_r2 = false;
 
 const unsigned long debounceDelay = 800;
-
+/*
 int lastLed_r1 = 0;
 int lastLed_r2 = 0;
 int lastLdr = 0;
@@ -61,7 +61,7 @@ bool Automatic_r2 = true;
 unsigned long lastSendTime_r1 = 0;
 unsigned long lastSendTime_r2 = 0;
 const unsigned long sendInterval = 3000;
-
+*/
 /*******************************************************/
 
 void setup() {
@@ -99,13 +99,15 @@ void setup() {
 
    pinMode(PIR_PIN_r2, INPUT);
   /*********************************************************/
-  ReadFromFirebase();
+  //ReadFromFirebase_r1();
+  //ReadFromFirebase_r2();
 
   //if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
   //  Automatic = firebaseData.boolData();
  
 }
 
+/*
 void loop() {
   if(Automatic_r1){
     LDR_Check();
@@ -344,6 +346,7 @@ void ReadFromFirebase_r2(){
     }
  }
 }
+*/
 /*
 void Firebase(){
   SendToFirebase_r1();
