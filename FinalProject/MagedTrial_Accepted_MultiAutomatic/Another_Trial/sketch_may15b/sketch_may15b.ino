@@ -103,14 +103,14 @@ void setup() {
     if(Automatic_r1){
       lastLed_r1 = !currentLed_r1;
       lastLdr = !currentLdr;
-      SendToFirebase_r1();
+     // SendToFirebase_r1();
     }
   }
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
     Automatic_r2 = firebaseData.boolData();
     if(Automatic_r2){
       lastLed_r2 = !currentLed_r2;
-      SendToFirebase_r2();
+     // SendToFirebase_r2();
     }
   }
  
@@ -123,14 +123,12 @@ void loop() {
     if (millis() - lastSendTime_r1 > sendInterval) {
       SendToFirebase_r1();
       lastSendTime_r1 = millis();
-      Serial.println("sent1");
     }
 
    }else{
     if (millis() - lastSendTime_r1 > sendInterval) {
       ReadFromFirebase_r1();
       lastSendTime_r1 = millis();
-      Serial.println("read1");
     }
    }
   if(Automatic_r2){
@@ -138,14 +136,12 @@ void loop() {
     if (millis() - lastSendTime_r2 > sendInterval) {
       SendToFirebase_r2();
       lastSendTime_r2 = millis();
-      Serial.println("sent2");
     }
 
    }else{
     if (millis() - lastSendTime_r2 > sendInterval) {
       ReadFromFirebase_r2();
       lastSendTime_r2 = millis();
-      Serial.println("read2");
     }
   }
 }
