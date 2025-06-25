@@ -11,347 +11,181 @@ const char* password = "55555555";
 #define FIREBASE_HOST "first-lighting-trial-default-rtdb.firebaseio.com"
 #define FIREBASE_AUTH "AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA"
 
-// Firebase and Wi-Fi objects
-FirebaseData firebaseData;
+FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-/***************************************************/
-#define LDR_PIN 36   
-#define LED_LDR 12   
+// Pins
+#define LDR_PIN 36
+#define LED_LDR 12
+
 #define IR1_r1 18
 #define IR2_r1 19
-#define PIR_PIN_r1 27          
+#define PIR_r1 27
 #define LED_r1 2
 
 #define IR1_r2 32
 #define IR2_r2 33
-#define PIR_PIN_r2 35          
+#define PIR_r2 35
 #define LED_r2 14
 
-int ldrValue;       
-int brightness;
+// Shared variables
+volatile int brightness = 0;
+volatile bool autoMode_r1 = true, autoMode_r2 = true;
+volatile int ledState_r1 = 0, ledState_r2 = 0;
 
-int peopleCount_r1 = 0;
-unsigned long t1_r1 = 0, t2_r1 = 0;
-unsigned long lastTrigger1_r1 = 0;
-unsigned long lastTrigger2_r1 = 0;
-bool detected1_r1 = false;
-bool detected2_r1 = false;
+volatile int peopleCount_r1 = 0;
+volatile int peopleCount_r2 = 0;
 
-int peopleCount_r2 = 0;
-unsigned long t1_r2 = 0, t2_r2 = 0;
-unsigned long lastTrigger1_r2 = 0;
-unsigned long lastTrigger2_r2 = 0;
-bool detected1_r2 = false;
-bool detected2_r2 = false;
-
-const unsigned long debounceDelay = 800;
-
-int lastLed_r1 = 0;
-int lastLed_r2 = 0;
-int lastLdr = 0;
-int currentLed_r1 = 0;
-int currentLed_r2 = 0;
-int currentLdr = 0;
-
-bool Automatic_r1 = true;
-bool Automatic_r2 = true;
-
-unsigned long lastSendTime_r1 = 0;
-unsigned long lastSendTime_r2 = 0;
+unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 3000;
-/*******************************************************/
 
 void setup() {
-    Serial.begin(9600);
+  Serial.begin(9600);
 
-    // Connect to WiFi
-    WiFi.begin(ssid, password);
-    Serial.print("Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("\nConnected!");
-
-    // Set up Firebase
-    config.host = FIREBASE_HOST;
-    config.signer.tokens.legacy_token = FIREBASE_AUTH;
-
-    Firebase.begin(&config, &auth);
-    Firebase.reconnectWiFi(true);
-
-    /******************************************************/
-    pinMode(IR1_r1, INPUT);
-    pinMode(IR2_r1, INPUT);
-    pinMode(LED_r1, OUTPUT);
-
-    pinMode(PIR_PIN_r1, INPUT);
-
-   ledcSetup(0, 5000, 8);       // channel 0, ferq 5 kh , resolution 8 bit (0-255)
-   ledcAttachPin(LED_LDR, 0);   // connect channel to pin
-
-   pinMode(IR1_r2, INPUT);
-   pinMode(IR2_r2, INPUT);
-   pinMode(LED_r2, OUTPUT);
-
-   pinMode(PIR_PIN_r2, INPUT);
-  /*********************************************************/
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r1")) {
-    Automatic_r1 = firebaseData.boolData();
-    if(Automatic_r1){
-      lastLed_r1 = !currentLed_r1;
-      lastLdr = !currentLdr;
-     // SendToFirebase_r1();
-    }
+  // WiFi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
   }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
-    Automatic_r2 = firebaseData.boolData();
-    if(Automatic_r2){
-      lastLed_r2 = !currentLed_r2;
-     // SendToFirebase_r2();
-    }
-  }
- 
+  Serial.println("\nWiFi Connected");
+
+  // Firebase
+  config.host = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  // PWM for LDR LED
+  ledcSetup(0, 5000, 8);
+  ledcAttachPin(LED_LDR, 0);
+
+  // Pins
+  pinMode(IR1_r1, INPUT); pinMode(IR2_r1, INPUT); pinMode(PIR_r1, INPUT); pinMode(LED_r1, OUTPUT);
+  pinMode(IR1_r2, INPUT); pinMode(IR2_r2, INPUT); pinMode(PIR_r2, INPUT); pinMode(LED_r2, OUTPUT);
+
+  // Get initial mode from Firebase
+  Firebase.RTDB.getBool(&fbdo, "/Mode/Automatic_r1");
+  autoMode_r1 = fbdo.boolData();
+  Firebase.RTDB.getBool(&fbdo, "/Mode/Automatic_r2");
+  autoMode_r2 = fbdo.boolData();
+
+  // Tasks
+  xTaskCreatePinnedToCore(TaskRoom1, "Room1Task", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(TaskRoom2, "Room2Task", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(TaskLDR, "LDRTask", 2048, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(TaskFirebase, "FirebaseTask", 8192, NULL, 1, NULL, 0);
 }
 
-void loop() {
-  if(Automatic_r1){
-    LDR_Check();
-    Infrared_Check_r1();
-    if (millis() - lastSendTime_r1 > sendInterval) {
-      SendToFirebase_r1();
-      lastSendTime_r1 = millis();
-    }
+// Room 1 Logic
+void TaskRoom1(void *pvParameters) {
+  bool ir1Detected = false, ir2Detected = false;
+  unsigned long t1 = 0, t2 = 0;
 
-   }else{
-    if (millis() - lastSendTime_r1 > sendInterval) {
-      ReadFromFirebase_r1();
-      lastSendTime_r1 = millis();
-    }
-   }
-  if(Automatic_r2){
-    Infrared_Check_r2();
-    if (millis() - lastSendTime_r2 > sendInterval) {
-      SendToFirebase_r2();
-      lastSendTime_r2 = millis();
-    }
+  for (;;) {
+    if (autoMode_r1) {
+      int ir1 = digitalRead(IR1_r1);
+      int ir2 = digitalRead(IR2_r1);
 
-   }else{
-    if (millis() - lastSendTime_r2 > sendInterval) {
-      ReadFromFirebase_r2();
-      lastSendTime_r2 = millis();
-    }
-  }
-}
+      if (ir1 == LOW && !ir1Detected) { ir1Detected = true; t1 = millis(); }
+      if (ir2 == LOW && !ir2Detected) { ir2Detected = true; t2 = millis(); }
 
-void LDR_Check(){
-  ldrValue = analogRead(LDR_PIN);  // range 0:4095
-  if (ldrValue > 3200) {  
-    brightness = 0; 
-    currentLdr = 0;
-  } else if (ldrValue > 1600) {  
-    brightness = 128;
-    currentLdr = 1;    
-  } else {  
-    brightness = 255;
-    currentLdr = 1;    
-  }ledcWrite(0, brightness);  // channel 0
-}
-
-void Infrared_Check_r1(){
-  unsigned long currentTime = millis();
-
-  int ir1State = digitalRead(IR1_r1);
-  int ir2State = digitalRead(IR2_r1);
-
-  // IR1
-  if (ir1State == LOW && !detected1_r1 && currentTime - lastTrigger1_r1 > debounceDelay) {
-    t1_r1 = currentTime;
-    detected1_r1 = true;
-    lastTrigger1_r1 = currentTime;
-    Serial.println("IR1 triggered");
-  }
-
-  // IR2
-  if (ir2State == LOW && !detected2_r1 && currentTime - lastTrigger2_r1 > debounceDelay) {
-    t2_r1 = currentTime;
-    detected2_r1 = true;
-    lastTrigger2_r1 = currentTime;
-    Serial.println("IR2 triggered");
-  }
-
-  // Check both sensors triggered
-  if (detected1_r1 && detected2_r1) {
-    if (abs((long)t1_r1 - (long)t2_r1) < 1500) { // ensure it’s within expected time
-      if (t1_r1 < t2_r1) {
-        peopleCount_r1++;
-        Serial.println("Person Entered");
-      } else {
-        if (peopleCount_r1 > 0) {
-          peopleCount_r1--;
-          Serial.println("Person Exited");
+      if (ir1Detected && ir2Detected) {
+        if (abs((long)t1 - (long)t2) < 2000) {
+          if (t1 < t2) peopleCount_r1++;
+          else if (peopleCount_r1 > 0) peopleCount_r1--;
         }
+        ir1Detected = ir2Detected = false;
+      }
+
+      if (digitalRead(PIR_r1) == HIGH && peopleCount_r1 > 0) {
+        digitalWrite(LED_r1, HIGH); ledState_r1 = 1;
+      } else {
+        digitalWrite(LED_r1, LOW); ledState_r1 = 0;
       }
     }
 
-    detected1_r1 = false;
-    detected2_r1 = false;
-    t1_r1 = 0;
-    t2_r1 = 0;
-  }else if(detected1_r1 && millis()-t1_r1 > 1500){
-     detected1_r1 = false;
-    detected2_r1 = false;
-    t1_r1 = 0;
-    t2_r1 = 0;
+    delay(100);
   }
-  else if(detected2_r1 && millis()-t2_r1 > 1500){
-     detected1_r1 = false;
-    detected2_r1 = false;
-    t1_r1 = 0;
-    t2_r1 = 0;
-  }
-   if(PIR_Check(PIR_PIN_r1) && peopleCount_r1 > 0){
-      digitalWrite(LED_r1, HIGH);
-      currentLed_r1 = 1;
-   }else{
-      digitalWrite(LED_r1, LOW);
-      currentLed_r1 = 0;
-   }
-    
 }
 
- void Infrared_Check_r2(){
-  unsigned long currentTime = millis();
+// Room 2 Logic
+void TaskRoom2(void *pvParameters) {
+  bool ir1Detected = false, ir2Detected = false;
+  unsigned long t1 = 0, t2 = 0;
 
-  int ir1State = digitalRead(IR1_r2);
-  int ir2State = digitalRead(IR2_r2);
+  for (;;) {
+    if (autoMode_r2) {
+      int ir1 = digitalRead(IR1_r2);
+      int ir2 = digitalRead(IR2_r2);
 
-  // IR1
-  if (ir1State == LOW && !detected1_r2 && currentTime - lastTrigger1_r2 > debounceDelay) {
-    t1_r2 = currentTime;
-    detected1_r2 = true;
-    lastTrigger1_r2 = currentTime;
-    Serial.println("IR1 triggered");
-  }
+      if (ir1 == LOW && !ir1Detected) { ir1Detected = true; t1 = millis(); }
+      if (ir2 == LOW && !ir2Detected) { ir2Detected = true; t2 = millis(); }
 
-  // IR2
-  if (ir2State == LOW && !detected2_r2 && currentTime - lastTrigger2_r2 > debounceDelay) {
-    t2_r2 = currentTime;
-    detected2_r2 = true;
-    lastTrigger2_r2 = currentTime;
-    Serial.println("IR2 triggered");
-  }
-
-  // Check both sensors triggered
-  if (detected1_r2 && detected2_r2) {
-    if (abs((long)t1_r2 - (long)t2_r2) < 3000) { // ensure it’s within expected time
-      if (t1_r2 < t2_r2) {
-        peopleCount_r2++;
-        Serial.println("Person Entered");
-      } else {
-        if (peopleCount_r2 > 0) {
-          peopleCount_r2--;
-          Serial.println("Person Exited");
+      if (ir1Detected && ir2Detected) {
+        if (abs((long)t1 - (long)t2) < 2000) {
+          if (t1 < t2) peopleCount_r2++;
+          else if (peopleCount_r2 > 0) peopleCount_r2--;
         }
+        ir1Detected = ir2Detected = false;
+      }
+
+      if (digitalRead(PIR_r2) == HIGH && peopleCount_r2 > 0) {
+        digitalWrite(LED_r2, HIGH); ledState_r2 = 1;
+      } else {
+        digitalWrite(LED_r2, LOW); ledState_r2 = 0;
       }
     }
 
-    detected1_r2 = false;
-    detected2_r2 = false;
-    t1_r2 = 0;
-    t2_r2 = 0;
-  }else if(detected1_r2 && millis()-t1_r2 > 1500){
-     detected1_r2 = false;
-    detected2_r2 = false;
-    t1_r2 = 0;
-    t2_r2 = 0;
-  }
-  else if(detected2_r2 && millis()-t2_r2 > 1500){
-     detected1_r2 = false;
-    detected2_r2 = false;
-    t1_r2 = 0;
-    t2_r2 = 0;
-  }
-
-   if(PIR_Check(PIR_PIN_r2) && peopleCount_r2 > 0){
-      digitalWrite(LED_r2, HIGH);
-      currentLed_r2 = 1;
-   }else{
-      digitalWrite(LED_r2, LOW);
-      currentLed_r2 = 0;
-   }
-    
-}
-
-bool PIR_Check(int pin){
-  if (digitalRead(pin) == HIGH) {
-    return true; 
-  } else {
-    return false;
+    delay(100);
   }
 }
 
-void SendToFirebase_r1(){
-  if(lastLed_r1 != currentLed_r1){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_one",digitalRead(LED_r1))) {
-      lastLed_r1 = currentLed_r1;
+// LDR Brightness Task
+void TaskLDR(void *pvParameters) {
+  for (;;) {
+    int ldr = analogRead(LDR_PIN);
+    if (ldr > 3200) brightness = 0;
+    else if (ldr > 1600) brightness = 128;
+    else brightness = 255;
+
+    ledcWrite(0, brightness);
+
+    delay(1000);
+  }
+}
+
+// Firebase Task
+void TaskFirebase(void *pvParameters) {
+  for (;;) {
+    if (Firebase.ready() && millis() - lastSendTime > sendInterval) {
+      lastSendTime = millis();
+
+      // Send data
+      Firebase.RTDB.setInt(&fbdo, "/rooms/room_one", ledState_r1);
+      Firebase.RTDB.setInt(&fbdo, "/rooms/room_two", ledState_r2);
+      Firebase.RTDB.setInt(&fbdo, "/outing/brightness", brightness);
+
+      // Read Modes
+      if (Firebase.RTDB.getBool(&fbdo, "/Mode/Automatic_r1"))
+        autoMode_r1 = fbdo.boolData();
+      if (Firebase.RTDB.getBool(&fbdo, "/Mode/Automatic_r2"))
+        autoMode_r2 = fbdo.boolData();
+
+      // Manual control (if auto is false)
+      if (!autoMode_r1 && Firebase.RTDB.getInt(&fbdo, "/rooms/room_one"))
+        digitalWrite(LED_r1, fbdo.intData());
+
+      if (!autoMode_r2 && Firebase.RTDB.getInt(&fbdo, "/rooms/room_two"))
+        digitalWrite(LED_r2, fbdo.intData());
+
+      if (!autoMode_r1 && Firebase.RTDB.getInt(&fbdo, "/outing/brightness"))
+        ledcWrite(0, fbdo.intData());
     }
+
+    delay(500);
   }
+}
+void loop(){
   
-  if(lastLdr != currentLdr){
-    if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )){
-      lastLdr = currentLdr;
-    }
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r1")) {
-    Automatic_r1 = firebaseData.boolData(); 
- }
 }
-void SendToFirebase_r2(){
-  if(lastLed_r2 != currentLed_r2){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_two",digitalRead(LED_r2) )){
-      lastLed_r2 = currentLed_r2;
-    }
-  }
-
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
-    Automatic_r2 = firebaseData.boolData(); 
-  }
-}
-void ReadFromFirebase_r1(){
-  if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_one")) {
-     currentLed_r1 = firebaseData.intData();
-     digitalWrite(LED_r1, currentLed_r1);
-     
-  }
-  
-  if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
-     currentLdr = firebaseData.intData();
-     ledcWrite(0, currentLdr);
-  }
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r1")) {
-    Automatic_r1 = firebaseData.boolData();
-    if(Automatic_r1){
-      lastLed_r1 = !currentLed_r1;
-      lastLdr = !currentLdr;
-      SendToFirebase_r1();
-    }
- }
-}
-void ReadFromFirebase_r2(){
-  if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_two")) {
-     currentLed_r2 = firebaseData.intData();
-     digitalWrite(LED_r2, currentLed_r2);
-  }
-  
-  if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic_r2")) {
-    Automatic_r2 = firebaseData.boolData();
-    if(Automatic_r2){
-      lastLed_r2 = !currentLed_r2;
-      SendToFirebase_r2();
-    }
- }
-}
-

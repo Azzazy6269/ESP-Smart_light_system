@@ -8,8 +8,8 @@ const char* ssid = "realme 6";
 const char* password = "55555555";
 
 // Firebase Credentials
-#define FIREBASE_HOST "first-lighting-trial-default-rtdb.firebaseio.com"
-#define FIREBASE_AUTH "AIzaSyCvrmdDmuCMjoBqtvSn7aYE8aSP3WBe3bA"
+#define FIREBASE_HOST "graduation-project-bumgd17-default-rtdb.firebaseio.com"
+#define FIREBASE_AUTH "AIzaSyDr7hgjahxcQkUsBAlB6MEi9Mjt14MZe5A"
 
 // Firebase and Wi-Fi objects
 FirebaseData firebaseData;
@@ -314,4 +314,3 @@ void ReadFromFirebase(){
     }
  }
 }
-
