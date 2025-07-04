@@ -2,7 +2,6 @@
 #include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
-#include <DHT11.h>
 
 // Wi-Fi Credentials
 const char* ssid = "Electro";
@@ -63,13 +62,7 @@ bool Automatic = true;
 unsigned long lastSend = 0;
  unsigned long sendInterval = 1500;
 /*******************************************************/
-DHT11 dht11(2);
-int temperature = 0;
-int humidity = 0;
-int temperature_firebase = 30;
-int humidity_firebase = 65;
-int temperature_firebase_last = 0;
-int humidity_firebase_last = 0;
+
 void setup() {
     Serial.begin(9600);
 
@@ -278,28 +271,7 @@ bool PIR_Check(int pin){
     return false;
   }
 }
-void DHT11_Check(){
-  int result = dht11.readTemperatureHumidity(temperature, humidity);
-  if (result == 0) {
-        Serial.print("Temperature: ");
-        Serial.print(temperature);
-        temperature_firebase = temperature;
-        Serial.print(" °C\tHumidity: ");
-        Serial.print(humidity);
-        Serial.println(" %");
-        humidity_firebase = humidity;
-    } else {
-        Serial.println(DHT11::getErrorString(result));
-    }
-   /* if(Automatic){
-      if(temperature_firebase > 30){
-        //digitalWrite(LED_r1, HIGH);
-      }else{
-        //digitalWrite(LED_r1, HIGH);
-      }
-      
-    }*/
-}
+
 void AutomaticFirebase(){
   if(lastLed_r1 != currentLed_r1){
     if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_one",digitalRead(LED_r1))) {
@@ -314,16 +286,6 @@ void AutomaticFirebase(){
   if(lastLdr != currentLdr){
     if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )){
       lastLdr = currentLdr;
-    }
-  }
-  if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temperature",temperature_firebase)) {
-      temperature_firebase_last = temperature_firebase;
-    }
-  }
-  if(humidity_firebase_last != humidity_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity",humidity_firebase)) {
-      humidity_firebase_last = humidity_firebase;
     }
   }
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
@@ -343,16 +305,6 @@ void ManualFirebase(){
   if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
      currentLdr = firebaseData.intData();
      ledcWrite(0, currentLdr);
-  }
-  if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temperature",temperature_firebase)) {
-      temperature_firebase_last = temperature_firebase;
-    }
-  }
-  if(humidity_firebase_last != humidity_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity",humidity_firebase)) {
-      humidity_firebase_last = humidity_firebase;
-    }
   }
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
     Automatic = firebaseData.boolData();

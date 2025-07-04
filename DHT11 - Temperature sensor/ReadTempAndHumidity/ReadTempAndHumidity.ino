@@ -9,7 +9,8 @@
  */
 
 // Include the DHT11 library for interfacing with the sensor.
-#include <DHT11.h>#include <WiFi.h>
+#include <DHT11.h>
+#include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"

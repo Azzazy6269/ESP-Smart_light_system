@@ -1,7 +1,7 @@
 #include "DHT.h"
 
-#define DHTPIN 4         // متصل بالرجل رقم 2 في الأردوينو
-#define DHTTYPE DHT22    // نوع الحساس
+#define DHTPIN 4         
+#define DHTTYPE DHT11    
 
 DHT dht(DHTPIN, DHTTYPE);
 
