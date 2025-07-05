@@ -1,0 +1,2 @@
+const char* ssid = "Await Connection";
+const char* password = "MGD.914614??bsbs.meow";
