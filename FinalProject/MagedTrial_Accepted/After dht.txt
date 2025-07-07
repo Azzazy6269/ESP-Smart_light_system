@@ -5,8 +5,8 @@
 #include <DHT11.h>
 
 // Wi-Fi Credentials
-const char* ssid = "Electro";
-const char* password = "Electro@2024";
+const char* ssid = "Await Connection";
+const char* password = "MGD.914614??bsbs.meow";
 
 // Firebase Credentials
 #define FIREBASE_HOST "graduation-project-bumgd17-default-rtdb.firebaseio.com"
@@ -119,6 +119,7 @@ void loop() {
     LDR_Check();
     Infrared_Check_r1();
     Infrared_Check_r2();
+    DHT11_Check();
     if (millis() - lastSend > sendInterval) {
       AutomaticFirebase();
       lastSend = millis();
@@ -126,6 +127,7 @@ void loop() {
 
   }else{
     sendInterval = 200;
+    DHT11_Check();
     if (millis() - lastSend > sendInterval) {
       ManualFirebase();
       lastSend = millis();
@@ -295,7 +297,7 @@ void DHT11_Check(){
         Serial.println(DHT11::getErrorString(result));
     }
     if(Automatic){
-      if(temperature_firebase > 30){
+      if(temperature_firebase > 25){
         fan_current = true;
         digitalWrite(Fan, HIGH);
       }else{
@@ -322,16 +324,15 @@ void AutomaticFirebase(){
     }
   }
   if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temperature",temperature_firebase)) {
+    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor",temperature_firebase)) {
       temperature_firebase_last = temperature_firebase;
     }
   } 
-  if(fan_last != fan_current){
+  /*if(fan_last != fan_current){
     if(Firebase.RTDB.setInt(&firebaseData, "/rooms/fan",fan_current)) {
       fan_last = fan_current;
     }
-  
-  }
+  }*/
   if(humidity_firebase_last != humidity_firebase){
     if(Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity",humidity_firebase)) {
       humidity_firebase_last = humidity_firebase;
@@ -356,7 +357,7 @@ void ManualFirebase(){
      ledcWrite(0, currentLdr);
   }
   if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temperature",temperature_firebase)) {
+    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor",temperature_firebase)) {
       temperature_firebase_last = temperature_firebase;
     }
   }
@@ -365,14 +366,14 @@ void ManualFirebase(){
       humidity_firebase_last = humidity_firebase;
     }
   }
-   if (Firebase.RTDB.getBool(&firebaseData, "/rooms/fan")) {
+  /* if (Firebase.RTDB.getBool(&firebaseData, "/rooms/fan")) {
     fan_current = firebaseData.boolData();
     if(fan_current){
       digitalWrite(Fan, HIGH);
     }else{
       digitalWrite(Fan, LOW);
     }
-   }
+   }*/
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
     Automatic = firebaseData.boolData();
     if(Automatic){
