@@ -17,21 +17,20 @@ FirebaseData firebaseData;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-/***************************************************/
+// Pin definitions
 #define LDR_PIN 36   
-   
 #define IR1_r1 19
 #define IR2_r1 18
 #define PIR_PIN_r1 35          
-
 #define IR1_r2 32
 #define IR2_r2 33
 #define PIR_PIN_r2 5          
-
 #define LED_r1 27
-#define LED_r2 14 //25
+#define LED_r2 14
 #define LED_r3 25
 #define LED_LDR 26
+#define motorPinA 22 // Fan control pin A (PWM-capable)
+#define motorPinB 23 // Fan control pin B (PWM-capable)
 
 int ldrValue;       
 int brightness;
@@ -62,92 +61,83 @@ int currentLdr = 0;
 bool Automatic = true;
 unsigned long lastSend = 0;
 unsigned long sendInterval = 1500;
-unsigned long DHTInterval = 5000;
-unsigned long lastDHT = 0;
 
-
-/*******************************************************/
 DHT11 dht11(2);
-#define motorPinA 22 // Fan control pin A (PWM-capable)
-#define motorPinB 23 // Fan control pin B (PWM-capable)
 int temperature = 0;
 int humidity = 0;
 int temperature_firebase = 30;
 int humidity_firebase = 45;
 int temperature_firebase_last = 0;
 int humidity_firebase_last = 0;
-bool fan_current;
-bool fan_last;
+int fan_current = 0; // 0: off, 1: clockwise full, 2: anticlockwise half, 3: clockwise 75%
+int fan_last = 0;
+
+// Fan control timing
+unsigned long fanStartTime = 0;
+const unsigned long fanInterval = 2000; // 2 seconds per state
+const unsigned long stopInterval = 1000; // 1 second stop
+int fanState = 0; // 0: clockwise full, 1: stop1, 2: anticlockwise half, 3: stop2, 4: clockwise 75%
 
 void setup() {
-    Serial.begin(9600);
+  Serial.begin(9600);
 
-    // Connect to WiFi
-    WiFi.begin(ssid, password);
-    Serial.print("Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("\nConnected!");
+  // Connect to WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected!");
 
-    // Set up Firebase
-    config.host = FIREBASE_HOST;
-    config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  // Set up Firebase
+  config.host = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
 
-    Firebase.begin(&config, &auth);
-    Firebase.reconnectWiFi(true);
-
-    /******************************************************/
-    pinMode(IR1_r1, INPUT);
-    pinMode(IR2_r1, INPUT);
-    pinMode(LED_r1, OUTPUT);
-
-    pinMode(PIR_PIN_r1, INPUT);
-
-   ledcSetup(0, 5000, 8);       // channel 0, ferq 5 kh , resolution 8 bit (0-255)
-   ledcAttachPin(LED_LDR, 0);   // connect channel to pin
-
-   pinMode(IR1_r2, INPUT);
-   pinMode(IR2_r2, INPUT);
-   pinMode(LED_r2, OUTPUT);
-
-   pinMode(PIR_PIN_r2, INPUT);
-
+  // Initialize pins
+  pinMode(IR1_r1, INPUT);
+  pinMode(IR2_r1, INPUT);
+  pinMode(LED_r1, OUTPUT);
+  pinMode(PIR_PIN_r1, INPUT);
+  pinMode(IR1_r2, INPUT);
+  pinMode(IR2_r2, INPUT);
+  pinMode(LED_r2, OUTPUT);
+  pinMode(PIR_PIN_r2, INPUT);
   pinMode(motorPinA, OUTPUT);
   pinMode(motorPinB, OUTPUT);
-  /*********************************************************/
+
+  ledcSetup(0, 5000, 8); // Channel 0, 5 kHz, 8-bit resolution
+  ledcAttachPin(LED_LDR, 0);
+
   ManualFirebase();
-  //if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-  //  Automatic = firebaseData.boolData();
 }
 
 void loop() {
-  if(Automatic){
+  if (Automatic) {
     sendInterval = 3000;
     LDR_Check();
     Infrared_Check_r1();
     Infrared_Check_r2();
+    DHT11_Check();
     if (millis() - lastSend > sendInterval) {
       AutomaticFirebase();
       lastSend = millis();
     }
-
-  }else{
+  } else {
     sendInterval = 200;
+    DHT11_Check();
     if (millis() - lastSend > sendInterval) {
       ManualFirebase();
       lastSend = millis();
+    }
   }
- }
- if (millis() - lastDHT > DHTInterval){
-    DHT11_Check();
-    lastDHT = millis();
-    DHTInterval = 10000;
- }
 }
 
-void LDR_Check(){
+
+
+void LDR_Check() {
   ldrValue = analogRead(LDR_PIN);  
   if (ldrValue > 3200) {  
     brightness = 0; 
@@ -158,16 +148,15 @@ void LDR_Check(){
   } else {  
     brightness = 255;
     currentLdr = 1;    
-  }ledcWrite(0, brightness);  // channel 0
+  }
+  ledcWrite(0, brightness);
 }
 
-void Infrared_Check_r1(){
+void Infrared_Check_r1() {
   unsigned long currentTime = millis();
-
   int ir1State = digitalRead(IR1_r1);
   int ir2State = digitalRead(IR2_r1);
 
-  // IR1
   if (ir1State == LOW && !detected1_r1 && currentTime - lastTrigger1_r1 > debounceDelay) {
     t1_r1 = currentTime;
     detected1_r1 = true;
@@ -175,7 +164,6 @@ void Infrared_Check_r1(){
     Serial.println("IR1 triggered1");
   }
 
-  // IR2
   if (ir2State == LOW && !detected2_r1 && currentTime - lastTrigger2_r1 > debounceDelay) {
     t2_r1 = currentTime;
     detected2_r1 = true;
@@ -183,53 +171,46 @@ void Infrared_Check_r1(){
     Serial.println("IR2 triggered1");
   }
 
-  // Check both sensors triggered
   if (detected1_r1 && detected2_r1) {
-    if (abs((long)t1_r1 - (long)t2_r1) < 1500) { // ensure it’s within expected time
+    if (abs((long)t1_r1 - (long)t2_r1) < 1500) {
       if (t1_r1 < t2_r1) {
         peopleCount_r1++;
         Serial.println("Person Entered1");
-      } else {
-        if (peopleCount_r1 > 0) {
-          peopleCount_r1--;
-          Serial.println("Person Exited1");
-        }
+      } else if (peopleCount_r1 > 0) {
+        peopleCount_r1--;
+        Serial.println("Person Exited1");
       }
     }
-
     detected1_r1 = false;
     detected2_r1 = false;
     t1_r1 = 0;
     t2_r1 = 0;
-  }else if(detected1_r1 && millis()-t1_r1 > 1500){
-     detected1_r1 = false;
+  } else if (detected1_r1 && millis() - t1_r1 > 1500) {
+    detected1_r1 = false;
+    detected2_r1 = false;
+    t1_r1 = 0;
+    t2_r1 = 0;
+  } else if (detected2_r1 && millis() - t2_r1 > 1500) {
+    detected1_r1 = false;
     detected2_r1 = false;
     t1_r1 = 0;
     t2_r1 = 0;
   }
-  else if(detected2_r1 && millis()-t2_r1 > 1500){
-     detected1_r1 = false;
-    detected2_r1 = false;
-    t1_r1 = 0;
-    t2_r1 = 0;
+
+  if (PIR_Check(PIR_PIN_r1) && peopleCount_r1 > 0) {
+    digitalWrite(LED_r1, HIGH);
+    currentLed_r1 = 1;
+  } else {
+    digitalWrite(LED_r1, LOW);
+    currentLed_r1 = 0;
   }
-   if(PIR_Check(PIR_PIN_r1) && peopleCount_r1 > 0){
-      digitalWrite(LED_r1, HIGH);
-      currentLed_r1 = 1;
-   }else{
-      digitalWrite(LED_r1, LOW);
-      currentLed_r1 = 0;
-   }
-    
 }
 
- void Infrared_Check_r2(){
+void Infrared_Check_r2() {
   unsigned long currentTime = millis();
-
   int ir1State = digitalRead(IR1_r2);
   int ir2State = digitalRead(IR2_r2);
 
-  // IR1
   if (ir1State == LOW && !detected1_r2 && currentTime - lastTrigger1_r2 > debounceDelay) {
     t1_r2 = currentTime;
     detected1_r2 = true;
@@ -237,7 +218,6 @@ void Infrared_Check_r1(){
     Serial.println("IR1 triggered2");
   }
 
-  // IR2
   if (ir2State == LOW && !detected2_r2 && currentTime - lastTrigger2_r2 > debounceDelay) {
     t2_r2 = currentTime;
     detected2_r2 = true;
@@ -245,155 +225,145 @@ void Infrared_Check_r1(){
     Serial.println("IR2 triggered2");
   }
 
-  // Check both sensors triggered
   if (detected1_r2 && detected2_r2) {
-    if (abs((long)t1_r2 - (long)t2_r2) < 3000) { // ensure it’s within expected time
+    if (abs((long)t1_r2 - (long)t2_r2) < 3000) {
       if (t1_r2 < t2_r2) {
         peopleCount_r2++;
         Serial.println("Person Entered2");
-      } else {
-        if (peopleCount_r2 > 0) {
-          peopleCount_r2--;
-          Serial.println("Person Exited2");
-        }
+      } else if (peopleCount_r2 > 0) {
+        peopleCount_r2--;
+        Serial.println("Person Exited2");
       }
     }
-
     detected1_r2 = false;
     detected2_r2 = false;
     t1_r2 = 0;
     t2_r2 = 0;
-  }else if(detected1_r2 && millis()-t1_r2 > 1500){
-     detected1_r2 = false;
+  } else if (detected1_r2 && millis() - t1_r2 > 1500) {
+    detected1_r2 = false;
     detected2_r2 = false;
     t1_r2 = 0;
     t2_r2 = 0;
-  }
-  else if(detected2_r2 && millis()-t2_r2 > 1500){
-     detected1_r2 = false;
+  } else if (detected2_r2 && millis() - t2_r2 > 1500) {
+    detected1_r2 = false;
     detected2_r2 = false;
     t1_r2 = 0;
     t2_r2 = 0;
   }
 
-   if(PIR_Check(PIR_PIN_r2) && peopleCount_r2 > 0){
-      digitalWrite(LED_r2, HIGH);
-      currentLed_r2 = 1;
-   }else{
-      digitalWrite(LED_r2, LOW);
-      currentLed_r2 = 0;
-   }
-    
-}
-
-bool PIR_Check(int pin){
-  return true;
-  if (digitalRead(pin) == HIGH) {
-    return true; 
+  if (PIR_Check(PIR_PIN_r2) && peopleCount_r2 > 0) {
+    digitalWrite(LED_r2, HIGH);
+    currentLed_r2 = 1;
   } else {
-    return false;
+    digitalWrite(LED_r2, LOW);
+    currentLed_r2 = 0;
   }
 }
-void DHT11_Check(){
+
+bool PIR_Check(int pin) {
+  return digitalRead(pin) == HIGH;
+}
+
+void DHT11_Check() {
   int result = dht11.readTemperatureHumidity(temperature, humidity);
   if (result == 0) {
-        Serial.print("Temperature: ");
-        Serial.print(temperature);
-        temperature_firebase = temperature;
-        Serial.print(" °C\tHumidity: ");
-        Serial.print(humidity);
-        Serial.println(" %");
-        humidity_firebase = humidity;
-   } else {
-        Serial.println(DHT11::getErrorString(result));
-      }
-    
-      if (temperature_firebase > 27) {
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    temperature_firebase = temperature;
+    Serial.print(" °C\tHumidity: ");
+    Serial.print(humidity);
+    Serial.println(" %");
+    humidity_firebase = humidity;
+  } else {
+    Serial.println(DHT11::getErrorString(result));
+  }
+
+    if (temperature_firebase > 32) {
       digitalWrite(motorPinA, HIGH);
       digitalWrite(motorPinB, LOW);
-      }else{
+    }else{
       digitalWrite(motorPinA, LOW);
       digitalWrite(motorPinB, LOW);
-      }
-    
+    }
+  
 }
-void AutomaticFirebase(){
-  if(lastLed_r1 != currentLed_r1){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_one",digitalRead(LED_r1))) {
+
+void AutomaticFirebase() {
+  if (lastLed_r1 != currentLed_r1) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/room_one", digitalRead(LED_r1))) {
       lastLed_r1 = currentLed_r1;
     }
   }
-  if(lastLed_r2 != currentLed_r2){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/room_two",digitalRead(LED_r2) )){
+  if (lastLed_r2 != currentLed_r2) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/room_two", digitalRead(LED_r2))) {
       lastLed_r2 = currentLed_r2;
     }
   }
-  if(lastLdr != currentLdr){
-    if(Firebase.RTDB.setInt(&firebaseData, "/outing/brightness",brightness )){
+  if (lastLdr != currentLdr) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/outing/brightness", brightness)) {
       lastLdr = currentLdr;
     }
   }
-  if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor",temperature_firebase)) {
+  if (temperature_firebase_last != temperature_firebase) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor", temperature_firebase)) {
       temperature_firebase_last = temperature_firebase;
     }
-  } 
-  /*if(fan_last != fan_current){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/fan",fan_current)) {
+  }
+  /*if (humidity_firebase_last != humidity_firebase) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity", humidity_firebase)) {
+      humidity_firebase_last = humidity_firebase;
+    }
+  }*/
+  /*if (fan_last != fan_current) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/fan", fan_current)) {
       fan_last = fan_current;
     }
   }*/
-  if(humidity_firebase_last != humidity_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity",humidity_firebase)) {
-      humidity_firebase_last = humidity_firebase;
-    }
-  }
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
-    Automatic = firebaseData.boolData(); 
- }
+    Automatic = firebaseData.boolData();
+  }
 }
-void ManualFirebase(){
+
+void ManualFirebase() {
   if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_one")) {
-     currentLed_r1 = firebaseData.intData();
-     digitalWrite(LED_r1, currentLed_r1);
-     
+    currentLed_r1 = firebaseData.intData();
+    digitalWrite(LED_r1, currentLed_r1);
   }
   if (Firebase.RTDB.getInt(&firebaseData, "/rooms/room_two")) {
-     currentLed_r2 = firebaseData.intData();
-     digitalWrite(LED_r2, currentLed_r2);
+    currentLed_r2 = firebaseData.intData();
+    digitalWrite(LED_r2, currentLed_r2);
   }
   if (Firebase.RTDB.getInt(&firebaseData, "/outing/brightness")) {
-     currentLdr = firebaseData.intData();
-     ledcWrite(0, currentLdr);
+    currentLdr = firebaseData.intData();
+    ledcWrite(0, currentLdr);
   }
-  if(temperature_firebase_last != temperature_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor",temperature_firebase)) {
+  /*if (Firebase.RTDB.getInt(&firebaseData, "/rooms/fan")) {
+    fan_current = firebaseData.intData();
+    controlFan(fan_current);
+  }*/
+  if (temperature_firebase_last != temperature_firebase) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/temp_sensor", temperature_firebase)) {
       temperature_firebase_last = temperature_firebase;
     }
   }
-  if(humidity_firebase_last != humidity_firebase){
-    if(Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity",humidity_firebase)) {
+  /*if (humidity_firebase_last != humidity_firebase) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/humidity", humidity_firebase)) {
       humidity_firebase_last = humidity_firebase;
     }
-  }
-  /* if (Firebase.RTDB.getBool(&firebaseData, "/rooms/fan")) {
-    fan_current = firebaseData.boolData();
-    if(fan_current){
-      digitalWrite(Fan, HIGH);
-    }else{
-      digitalWrite(Fan, LOW);
+  }*/
+  /*if (fan_last != fan_current) {
+    if (Firebase.RTDB.setInt(&firebaseData, "/rooms/fan", fan_current)) {
+      fan_last = fan_current;
     }
-   }*/
+  }*/
   if (Firebase.RTDB.getBool(&firebaseData, "/Mode/Automatic")) {
     Automatic = firebaseData.boolData();
-    if(Automatic){
+    if (Automatic) {
       lastLed_r1 = !currentLed_r1;
       lastLed_r2 = !currentLed_r2;
       lastLdr = !currentLdr;
       fan_last = !fan_current;
-      peopleCount_r2 = 0;
-      peopleCount_r1 = 0;
       AutomaticFirebase();
     }
- }
+  }
 }
